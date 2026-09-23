@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>睡眠的內在節奏 · EMD 互動實驗室</title>
+<meta name="description" content="以互動演算法理解黃鍔院士的經驗模態分解（EMD）、Hilbert–Huang 轉換、HHSA 與 iPDF 在睡眠腦波研究上的意義。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M2 20 C6 6 10 6 13 16 S20 28 23 14 S28 8 30 12' fill='none' stroke='%232f6fdf' stroke-width='3' stroke-linecap='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">黃鍔院士演講 · 課前導讀 · 2026/09/24</p>
+    <h1>睡眠的內在節奏</h1>
+    <p class="lede">睡眠腦波不是一組穩定的正弦波，而是一段又一段<b>忽強忽弱、忽快忽慢</b>的振盪：α 波的漸強漸弱、紡錘波一閃即逝、慢波的波形前陡後緩。
+      <b>經驗模態分解（EMD）</b>不預設任何基底函數，讓資料「自己」決定它由哪些節奏組成。這個網站把演算法搬進瀏覽器，每一步都可以動手玩。</p>
+    <nav class="toc">
+      <a href="#why">1 · 為什麼傅立葉不夠</a>
+      <a href="#sift">2 · Sifting 篩選</a>
+      <a href="#decompose">3 · 拆解睡眠腦波</a>
+      <a href="#mixing">4 · 模態混疊與 CEEMD</a>
+      <a href="#hhsa">5 · HHSA：調幅的調幅</a>
+      <a href="#ipdf">6 · iPDF：量化意識</a>
+      <a href="#papers">7 · 論文與提問</a>
+    </nav>
+    <button id="theme" class="ghost" aria-label="切換深淺色">◐ 主題</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="why">
+  <h2><span class="num">1</span>為什麼傅立葉不夠</h2>
+  <div class="prose">
+    <p>傅立葉分析假設訊號是<b>線性</b>且<b>平穩</b>的，用固定頻率、固定振幅的正弦波去拼湊。遇到「非正弦」的波形，傅立葉只能用一堆<b>諧波</b>來補形狀，這些諧波在生理上並不存在。
+      黃鍔在 1998 年的論文中指出：非線性系統的特徵是<b>波內調頻（intra-wave frequency modulation）</b>，一個週期之內頻率本身就在變化。</p>
+    <p>下面的波形是 <code>x(t) = cos(ωt + ε·sin ωt)</code>。把 ε 拉大，波形會變得前陡後緩，很像睡眠慢波或鋸齒波。請比較右邊兩種「頻率」的描述方式。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <label>非線性程度 ε <input type="range" id="eps" min="0" max="0.9" step="0.05" value="0.5"><output id="epsOut">0.50</output></label>
+      <label>基頻 f₀ <input type="range" id="f0" min="0.5" max="4" step="0.1" value="1.5"><output id="f0Out">1.5 Hz</output></label>
+    </div>
+    <div class="grid2">
+      <figure><canvas id="cWave"></canvas><figcaption>波形（前 4 秒）</figcaption></figure>
+      <figure><canvas id="cFourier"></canvas><figcaption><b class="k1">傅立葉功率譜</b>：出現 2f₀、3f₀… 的諧波</figcaption></figure>
+    </div>
+    <figure><canvas id="cIF"></canvas><figcaption><b class="k2">Hilbert 瞬時頻率</b>：只有一個成分，頻率在 f₀·(1−ε) 到 f₀·(1+ε) 之間擺盪，形狀資訊都在 IF 裡</figcaption></figure>
+    <p class="takeaway" id="whyNote"></p>
+  </div>
+</section>
+
+<section id="sift">
+  <h2><span class="num">2</span>Sifting 篩選：一步一步把最快的節奏拿出來</h2>
+  <div class="prose">
+    <p>EMD 的核心只有一個動作：找出所有局部極大值與極小值，以三次樣條連成<b class="k1">上包絡</b>與<b class="k3">下包絡</b>，求出兩者的<b class="k2">平均</b>，再從訊號中減掉平均。
+      重複這個動作，直到剩下的曲線在局部上下對稱，也就是一個<b>本質模態函數（IMF）</b>：</p>
+    <ol class="rules">
+      <li>極值點數與過零點數相等或最多差 1；</li>
+      <li>上下包絡的平均在任何時間點都接近零。</li>
+    </ol>
+    <p>把 IMF 從訊號中扣掉，對殘餘量重複同樣的程序，就會依序得到由快到慢的各個振盪，直到殘餘量成為單調趨勢。本實作固定 sifting 10 次（Wu &amp; Huang 2009 的建議值）。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <label>訊號 <select id="siftSig">
+        <option value="n2">N2 睡眠（紡錘波 + K 複合波）</option>
+        <option value="wake">Wake（α 波）</option>
+        <option value="intermittent">慢波 + 間歇紡錘</option>
+      </select></label>
+      <button id="siftStep" class="primary">▶ 做一次 sifting</button>
+      <button id="siftImf">⏭ 完成此 IMF（共 10 次）</button>
+      <button id="siftReset" class="ghost">↺ 重來</button>
+    </div>
+    <div class="status" id="siftStatus"></div>
+    <figure><canvas id="cSift"></canvas><figcaption>目前的 h(t)，<b class="k1">上包絡</b>、<b class="k3">下包絡</b>、<b class="k2">包絡平均 m(t)</b>（圓點為極值）</figcaption></figure>
+    <figure><canvas id="cSiftImfs"></canvas><figcaption>已取出的 IMF</figcaption></figure>
+  </div>
+</section>
+
+<section id="decompose">
+  <h2><span class="num">3</span>拆解睡眠腦波：IMF 與 Hilbert 譜</h2>
+  <div class="prose">
+    <p>選一個睡眠期看看。每個 IMF 經過 Hilbert 轉換，都會得到每一個時間點的<b>瞬時振幅</b>與<b>瞬時頻率</b>，疊起來就是 Hilbert 譜。紡錘波在傅立葉譜上只是 13 Hz 一個模糊的小峰；
+      在 Hilbert 譜上則是一段一段<b>有開頭、有結尾</b>的亮帶，可以直接數出幾顆、各持續多久。</p>
+    <p class="note">⚠ 本頁所有睡眠腦波都是依照 AASM 各睡眠期的典型特徵（α、紡錘波、K 複合波、δ 慢波、鋸齒波）<b>人工合成的教學訊號</b>，fs = 100 Hz，並非真實 PSG 資料。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <div class="seg" id="stageSeg"></div>
+      <label>方法 <select id="method"><option value="emd">EMD</option><option value="ceemd">CEEMD（互補集成）</option></select></label>
+      <label>白雜訊 <input type="range" id="noise" min="0" max="0.8" step="0.05" value="0.15"><output id="noiseOut">0.15</output></label>
+      <button id="reseed" class="ghost">🎲 換一段</button>
+    </div>
+    <div class="status" id="decStatus"></div>
+    <figure><canvas id="cRaw"></canvas><figcaption>原始訊號（20 秒）</figcaption></figure>
+    <div class="grid2 wide-left">
+      <figure><canvas id="cImfs"></canvas><figcaption>IMF 由快到慢；右側數字為平均瞬時頻率。點一下某個 IMF 可在右圖高亮</figcaption></figure>
+      <div>
+        <figure><canvas id="cHS"></canvas><figcaption>Hilbert 譜（時間 × 瞬時頻率，亮度 = 能量）</figcaption></figure>
+        <figure><canvas id="cMarg"></canvas><figcaption><b class="k2">Hilbert 邊際譜</b> vs <b class="k1">傅立葉譜</b>（已各自正規化）</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="mixing">
+  <h2><span class="num">4</span>模態混疊與 CEEMD：雜訊反而幫了忙</h2>
+  <div class="prose">
+    <p>原始 EMD 有一個著名的弱點：當高頻振盪是<b>間歇</b>出現時（例如紡錘波），同一個 IMF 裡會一下子是紡錘波、一下子是慢波，這叫<b>模態混疊（mode mixing）</b>。
+      Wu 與黃鍔（2009）提出 <b>EEMD</b>：加上許多組白雜訊再分別做 EMD 後平均。白雜訊在各尺度上均勻鋪滿，提供一把「量尺」，讓每個 IMF 固定在同一個頻帶；雜訊本身則在平均時互相抵消。
+      Yeh、Shieh 與黃鍔（2010）的 <b>CEEMD</b> 更進一步，成對加入 <code>+w</code> 與 <code>−w</code>，讓殘留雜訊完全抵消。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <label>雜訊振幅（× std）<input type="range" id="mixNoise" min="0.05" max="0.6" step="0.05" value="0.2"><output id="mixNoiseOut">0.20</output></label>
+      <label>雜訊對數 <input type="range" id="mixPairs" min="2" max="40" step="1" value="15"><output id="mixPairsOut">15</output></label>
+      <button id="mixRun" class="primary">▶ 比較 EMD vs CEEMD</button>
+    </div>
+    <div class="status" id="mixStatus"></div>
+    <figure><canvas id="cMixRaw"></canvas><figcaption>1 Hz 慢波 + 三段 13 Hz 紡錘波</figcaption></figure>
+    <div class="grid2">
+      <figure><canvas id="cMixA"></canvas><figcaption><b>EMD</b> 的 IMF 1–3</figcaption></figure>
+      <figure><canvas id="cMixB"></canvas><figcaption><b>CEEMD</b> 的 IMF 1–4</figcaption></figure>
+    </div>
+    <p class="takeaway" id="mixNote"></p>
+  </div>
+</section>
+
+<section id="hhsa">
+  <h2><span class="num">5</span>HHSA：看見「調幅的調幅」</h2>
+  <div class="prose">
+    <p>傳統頻譜與 Hilbert 譜都只回答「<b>哪個頻率</b>有能量」。但睡眠腦波最重要的資訊常常藏在<b>振幅怎麼變</b>：α 波每隔一兩秒漸強漸弱、紡錘波約每 4–5 秒冒一次、慢波的上升相帶著紡錘波（跨頻耦合）。
+      黃鍔等人 2016 年提出的 <b>Holo-Hilbert Spectral Analysis</b> 做兩層 EMD：第一層得到每個 IMF 的載波頻率 <i>f</i><sub>c</sub> 與振幅包絡；第二層對包絡<b>再做一次 EMD</b>，得到調幅頻率 <i>f</i><sub>am</sub>。
+      結果是一張二維「全息」譜，可以直接看到哪個載波被哪個節奏調變。這也是近年他與中央大學梁偉光、阮啟弘團隊用在失智、帕金森、麻醉 EEG 的方法。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <div class="seg" id="hhsaSeg"></div>
+    </div>
+    <div class="status" id="hhsaStatus"></div>
+    <div class="grid2">
+      <figure><canvas id="cHHSA"></canvas><figcaption>HHSA：橫軸載波頻率 <i>f</i><sub>c</sub>，縱軸調幅頻率 <i>f</i><sub>am</sub></figcaption></figure>
+      <figure><canvas id="cEnv"></canvas><figcaption>能量最大的 IMF 及其<b class="k2">振幅包絡</b>，第二層 EMD 分析的就是這條包絡</figcaption></figure>
+    </div>
+    <p class="takeaway" id="hhsaNote"></p>
+  </div>
+</section>
+
+<section id="ipdf">
+  <h2><span class="num">6</span>iPDF：用 IMF 的機率分布量化「意識」</h2>
+  <div class="prose">
+    <p>黃鍔、梁偉光、郭博昭等人 2025 年在 <i>Biological Psychology</i> 提出 <b>intrinsic probability density function（iPDF）</b>：先用 EMD 取得 IMF，再由高頻往低頻逐步累加
+      <code>S<sub>k</sub> = c<sub>1</sub> + … + c<sub>k</sub></code>，在每一個尺度上看資料值的機率分布。論文結論是：</p>
+    <ul class="rules">
+      <li><b>清醒與 REM</b>：皮質間交互作用活躍、調變強，分布呈 <b>super-Gaussian</b>（尖峰、厚尾，峰度 &gt; 0）；</li>
+      <li><b>深睡與麻醉</b>：交互作用減少，分布接近 <b>Gaussian</b>；</li>
+      <li>以 iPDF 特徵分類失智症患者與健康者，準確率約 87%。</li>
+    </ul>
+    <p>直覺上，如果許多獨立、穩定的小振盪疊加，依中央極限定理會趨近常態分布；若振盪被<b>強烈調幅</b>（大部分時間小、偶爾爆發），就會出現厚尾。所以 iPDF 其實量的是「調變」，和第 5 節的 HHSA 是同一個觀點的兩種看法。</p>
+  </div>
+  <div class="panel">
+    <div class="controls">
+      <label>觀察尺度 k（累加到第幾個 IMF）<input type="range" id="ipdfK" min="1" max="8" step="1" value="8"><output id="ipdfKOut">8</output></label>
+      <button id="ipdfRun" class="primary">▶ 重新計算四個睡眠期</button>
+    </div>
+    <div class="status" id="ipdfStatus"></div>
+    <div class="grid4" id="ipdfGrid"></div>
+    <figure><canvas id="cKurt"></canvas><figcaption>各睡眠期的超額峰度隨尺度 k 變化（0 = 常態分布）</figcaption></figure>
+    <p class="takeaway">在這組合成訊號上，Wake 與 REM 的峰度明顯高於 N3，方向與論文一致。但這是我們<b>刻意</b>用「有無強烈調幅」來合成各期訊號得到的示意，數值本身沒有臨床意義。</p>
+  </div>
+</section>
+
+<section id="papers">
+  <h2><span class="num">7</span>論文清單與演講可以問的問題</h2>
+  <div class="papers">
+    <article><span class="yr">1998</span><div><h3>The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis</h3>
+      <p class="au">Huang NE, Shen Z, Long SR, Wu MC, Shih HH, Zheng Q, Yen NC, Tung CC, Liu HH · <i>Proc. R. Soc. Lond. A</i> 454:903–995</p>
+      <p>EMD 與 Hilbert 譜的原始論文，提出 IMF 定義、sifting 程序與「波內調頻」的觀念。→ 第 1、2 節</p>
+      <a href="https://doi.org/10.1098/rspa.1998.0193" target="_blank" rel="noopener">doi:10.1098/rspa.1998.0193</a></div></article>
+    <article><span class="yr">2009</span><div><h3>Ensemble empirical mode decomposition: a noise-assisted data analysis method</h3>
+      <p class="au">Wu Z, Huang NE · <i>Adv. Adapt. Data Anal.</i> 1(1):1–41</p>
+      <p>以白雜訊輔助解決模態混疊。→ 第 4 節</p>
+      <a href="https://doi.org/10.1142/S1793536909000047" target="_blank" rel="noopener">doi:10.1142/S1793536909000047</a></div></article>
+    <article><span class="yr">2010</span><div><h3>Complementary ensemble empirical mode decomposition: a novel noise enhanced data analysis method</h3>
+      <p class="au">Yeh JR, Shieh JS, Huang NE · <i>Adv. Adapt. Data Anal.</i> 2(2):135–156</p>
+      <p>成對 ±雜訊，讓重建誤差消失。本站 CEEMD 的實作依據。→ 第 3、4 節</p>
+      <a href="https://doi.org/10.1142/S1793536910000422" target="_blank" rel="noopener">doi:10.1142/S1793536910000422</a></div></article>
+    <article><span class="yr">2010</span><div><h3>Investigating fractal property and respiratory modulation of human heartbeat time series using empirical mode decomposition</h3>
+      <p class="au">Yeh JR, Sun WZ, Shieh JS, Huang NE · <i>Med. Eng. Phys.</i> 32:490–496</p>
+      <p>用 EMD 從 RR 間期中分離呼吸調變（RSA），適用於睡眠中的心肺耦合與 HRV 分析。</p>
+      <a href="https://doi.org/10.1016/j.medengphy.2010.02.022" target="_blank" rel="noopener">doi:10.1016/j.medengphy.2010.02.022</a></div></article>
+    <article><span class="yr">2016</span><div><h3>On Holo-Hilbert spectral analysis: a full informational spectral representation for nonlinear and non-stationary data</h3>
+      <p class="au">Huang NE, Hu K, Yang AC, Chang HC, Jia D, Liang WK, Yeh JR, Kao CL, Juan CH, Peng CK, Meijer JH, Wang YH, Long SR, Wu Z · <i>Phil. Trans. R. Soc. A</i> 374:20150206</p>
+      <p>兩層 EMD，把「調幅」也納入頻譜，得到 <i>f</i><sub>c</sub> × <i>f</i><sub>am</sub> 的全資訊譜。→ 第 5 節</p>
+      <a href="https://doi.org/10.1098/rsta.2015.0206" target="_blank" rel="noopener">doi:10.1098/rsta.2015.0206</a></div></article>
+    <article><span class="yr">2017</span><div><h3>Evaluating and improving automatic sleep spindle detection by using multi-objective evolutionary algorithms</h3>
+      <p class="au">Liu MY, Huang A, Huang NE · <i>Front. Hum. Neurosci.</i> 11:261</p>
+      <p>比較傅立葉、小波與 HHT 的紡錘波偵測器；傅立葉與 HHT 混合的方法在 DREAMS/MASS 資料庫上 F1 達 0.726–0.737。</p>
+      <a href="https://doi.org/10.3389/fnhum.2017.00261" target="_blank" rel="noopener">doi:10.3389/fnhum.2017.00261</a></div></article>
+    <article><span class="yr">2023</span><div><h3>A holo-spectral EEG analysis provides an early detection of cognitive decline and predicts the progression to Alzheimer's disease</h3>
+      <p class="au">Chu KT, Lei WC, Wu MH, Fuh JL, Wang SJ, French IT, Chang WS, Chang CF, Huang NE, Liang WK, Juan CH · <i>Front. Aging Neurosci.</i> 15:1195424</p>
+      <p>HHSA 用於靜息 EEG，偵測認知退化並預測進展為阿茲海默症。</p>
+      <a href="https://doi.org/10.3389/fnagi.2023.1195424" target="_blank" rel="noopener">doi:10.3389/fnagi.2023.1195424</a></div></article>
+    <article class="hl"><span class="yr">2025</span><div><h3>Quantifying consciousness through intrinsic probability density function</h3>
+      <p class="au">Huang NE, Yuan WS, Yang AC, Kuo TBJ, Tang WX, Kang H, Wagner M, Liang WK · <i>Biol. Psychol.</i> 200:109101</p>
+      <p>本次演講最相關的論文：以 EMD 為基礎的 iPDF 區分清醒、REM、深睡、麻醉與失智狀態。→ 第 6 節</p>
+      <a href="https://doi.org/10.1016/j.biopsycho.2025.109101" target="_blank" rel="noopener">doi:10.1016/j.biopsycho.2025.109101</a></div></article>
+    <article><span class="yr">2026</span><div><h3>Exploring nociceptive-analgesic balance and EEG modulation patterns during general anesthesia using Holo-Hilbert spectral analysis</h3>
+      <p class="au">Ho CN, Huang NE, Chen JY, Yang AC · <i>Pain Res. Manag.</i> 2026:5504074</p>
+      <p>HHSA 發現麻醉中 α 載波（8–16 Hz）同時被 3–6 Hz 與 1–2 Hz 調幅，兩者隨疼痛指數消長。</p>
+      <a href="https://doi.org/10.1155/prm/5504074" target="_blank" rel="noopener">doi:10.1155/prm/5504074</a></div></article>
+  </div>
+
+  <h3 class="qhead">這個主題的意義</h3>
+  <div class="prose">
+    <ul class="rules">
+      <li><b>從「哪個頻帶有多少能量」到「振盪如何被調變」。</b>AASM 睡眠分期本來就是看<i>事件</i>：紡錘波、K 複合波、慢波的出現與形狀。EMD/HHT 保留了時間位置與波形，比固定視窗的 FFT 更接近睡眠技師看圖的方式。</li>
+      <li><b>適應性（adaptive）。</b>基底由資料決定，不必事先選小波母函數或視窗長度；對個體差異大的睡眠腦波（年齡、藥物、疾病）特別重要。</li>
+      <li><b>意識是跨尺度交互的結果。</b>HHSA 與 iPDF 都在量「調變」：清醒與 REM 的皮質活動彼此調變、呈厚尾分布；深睡與麻醉時交互減少、趨近高斯。這給了「意識程度」一個可計算、可跨狀態比較的指標。</li>
+      <li><b>臨床延伸。</b>同一套工具已用在失智早期偵測、帕金森分期、麻醉疼痛監測、HRV 呼吸調變，睡眠是把它們串在一起的自然實驗場：每晚都會經歷一次意識的起落。</li>
+    </ul>
+  </div>
+  <h3 class="qhead">演講時可以問的問題</h3>
+  <ol class="qs">
+    <li>iPDF 在睡眠分期上，N1 與 N2 這種過渡狀態的分布會落在哪裡？能不能取代或輔助 AASM 人工判讀？</li>
+    <li>EMD 的邊界效應與 IMF 數量會隨訊號長度改變；iPDF 用 30 秒 epoch 還是更長的片段？對結果敏感嗎？</li>
+    <li>乾電極、額頭單通道這類穿戴式睡眠 EEG 雜訊較高，CEEMD 的雜訊振幅該怎麼選？HHSA 能不能分辨眼動 / 肌電偽影與真實的調幅？</li>
+    <li>HHSA 看得到慢波與紡錘波的跨頻耦合，這和記憶鞏固研究常用的 PAC（phase–amplitude coupling）有什麼差別與優勢？</li>
+    <li>心率變異（HRV）在睡眠中也有強烈的呼吸調變，iPDF/HHSA 能不能同時用在心電與腦波，量化腦–心耦合？</li>
+  </ol>
+</section>
+
+</main>
+<footer class="wrap">
+  <p>所有演算法（EMD、CEEMD、Hilbert 轉換、HHSA、iPDF）皆以原生 JavaScript 在瀏覽器即時計算，原始碼見 GitHub。本站為課程學習用途，睡眠訊號為人工合成，演算法為教學用簡化實作（固定 10 次 sifting、樣條邊界鏡射），與原作者的軟體可能有差異。</p>
+</footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

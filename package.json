@@ -1,0 +1,1 @@
+{"type":"module","name":"emd-sleep-lab","private":true,"scripts":{"test":"node test/emd.test.js"}}
