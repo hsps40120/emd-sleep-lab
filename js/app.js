@@ -205,25 +205,32 @@ async function runMix() {
   $('mixRun').disabled = false;
   drawMix();
 }
-// 以「IMF 中 13 Hz 成分所占比例」衡量混疊：理想狀況下紡錘波只出現在一個 IMF
-function spindleShare(imfs) {
-  const truth = mix.x.map((v, i) => v - Math.sin(2 * Math.PI * i / FS));
-  const tE = truth.reduce((s, v) => s + v * v, 0);
-  return imfs.map((c) => { const dot = c.reduce((s, v, i) => s + v * truth[i], 0); return Math.max(0, dot) / tE; });
+// 以相關係數衡量混疊：理想狀況下紡錘波（或慢波）完整落在單一 IMF，與真實成分的相關接近 1
+function purity(imfs, truth) {
+  const corr = (a, b) => {
+    let ab = 0, aa = 0, bb = 0;
+    for (let i = 100; i < a.length - 100; i++) { ab += a[i] * b[i]; aa += a[i] ** 2; bb += b[i] ** 2; }
+    return aa * bb > 0 ? ab / Math.sqrt(aa * bb) : 0;
+  };
+  const r = imfs.map((c) => corr(c, truth));
+  const k = r.indexOf(Math.max(...r));
+  return [k + 1, r[k]];
 }
 function drawMix() {
   if (!mix.a) return;
   const pal = P.palette();
   P.lines($('cMixRaw'), [{ y: mix.x, color: pal.ink }], { height: 110, x1: 10, xLabel: 's' });
   const A = mix.a.imfs.slice(0, 3), B = mix.b.imfs.slice(0, 4);
-  const sa = spindleShare(mix.a.imfs), sb = spindleShare(mix.b.imfs);
+  const slow = mix.x.map((_, i) => Math.sin(2 * Math.PI * i / FS));
+  const sp = mix.x.map((v, i) => v - slow[i]);
   drawStack($('cMixA'), A, A.map((_, k) => `IMF ${k + 1}`), { rowH: 56, x1: 10 });
   drawStack($('cMixB'), B, B.map((_, k) => `IMF ${k + 1}`), { rowH: 56, x1: 10 });
-  const top = (s) => { const i = s.indexOf(Math.max(...s)); return [i + 1, s[i]]; };
-  const [ia, va] = top(sa), [ib, vb] = top(sb);
+  const [ia, va] = purity(mix.a.imfs, sp), [ib, vb] = purity(mix.b.imfs, sp);
+  const [ja, wa] = purity(mix.a.imfs, slow), [jb, wb] = purity(mix.b.imfs, slow);
   $('mixNote').innerHTML = `看左圖 EMD 的 IMF 1：沒有紡錘波的時段，它會「借」慢波的一部分來填空，同一個 IMF 裡混了兩種尺度。
-    量化：紡錘波能量集中在單一 IMF 的比例，EMD 是 IMF ${ia} 的 <b>${(va * 100).toFixed(0)}%</b>，CEEMD 是 IMF ${ib} 的 <b>${(vb * 100).toFixed(0)}%</b>。
-    把雜訊振幅調太小（&lt;0.1）或對數太少，CEEMD 的優勢就會變小；調太大則雜訊會把紡錘波能量拆散到相鄰 IMF。`;
+    量化（IMF 與真實成分的相關係數，1 = 完全分離）：紡錘波 EMD 為 IMF ${ia} 的 <b>${va.toFixed(2)}</b>，CEEMD 為 IMF ${ib} 的 <b>${vb.toFixed(2)}</b>；
+    1 Hz 慢波 EMD <b>${wa.toFixed(2)}</b>（IMF ${ja}），CEEMD <b>${wb.toFixed(2)}</b>（IMF ${jb}）。
+    代價是計算量：CEEMD 要做 ${2 * +$('mixPairs').value} 次完整 EMD。試著把雜訊對數調到 2，看平均不足時殘留的雜訊。`;
 }
 $('mixRun').onclick = runMix;
 
@@ -261,7 +268,7 @@ function drawHHSA() {
   c.res.grid.forEach((row, y) => row.forEach((v, x) => { if (v > best[0]) best = [v, x, y]; }));
   const fc = (best[1] + 0.5) * 24 / 48, fam = (best[2] + 0.5) * 4 / 48;
   const text = {
-    wake: 'α 載波（約 10 Hz）被約 0.5–1 Hz 的節奏調幅，對應 α 波「漸強漸弱」的紡錘狀包絡。這種調幅在一般功率譜上完全看不到。',
+    wake: 'α 載波（約 10 Hz）被 1 Hz 以下的慢節奏調幅，對應 α 波「漸強漸弱」的紡錘狀包絡。這種調幅在一般功率譜上完全看不到。',
     n2: '紡錘波載波約 13 Hz，包絡約每 4–5 秒出現一次，調幅能量集中在很低的 fam；θ 背景的調幅則分散。',
     n3: '能量集中在 δ 載波（&lt;2 Hz），而且調幅相對弱且分散：慢波「一直都在」，很少忽強忽弱。這正是第 6 節 iPDF 在 N3 接近高斯分布的原因。',
     rem: '鋸齒波（2–4 Hz）與 β 叢集都有明顯的間歇調幅；REM 的「混合頻率、低振幅」在 HHSA 上呈現為多個分散的調幅島。',
@@ -341,9 +348,10 @@ let rt;
 window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 150); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
 
-drawWhy();
-siftReset();
 (async () => {
+  try { await document.fonts.ready; } catch {}
+  drawWhy();
+  siftReset();
   await runDecompose();
   await runHHSA();
   await runMix();

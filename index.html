@@ -37,7 +37,7 @@
   <div class="prose">
     <p>傅立葉分析假設訊號是<b>線性</b>且<b>平穩</b>的，用固定頻率、固定振幅的正弦波去拼湊。遇到「非正弦」的波形，傅立葉只能用一堆<b>諧波</b>來補形狀，這些諧波在生理上並不存在。
       黃鍔在 1998 年的論文中指出：非線性系統的特徵是<b>波內調頻（intra-wave frequency modulation）</b>，一個週期之內頻率本身就在變化。</p>
-    <p>下面的波形是 <code>x(t) = cos(ωt + ε·sin ωt)</code>。把 ε 拉大，波形會變得前陡後緩，很像睡眠慢波或鋸齒波。請比較右邊兩種「頻率」的描述方式。</p>
+    <p>下面的波形是 <code>x(t) = cos(ωt + ε·sin ωt)</code>。把 ε 拉大，波形會變得前陡後緩，很像睡眠慢波或鋸齒波。請比較兩種「頻率」的描述方式。</p>
   </div>
   <div class="panel">
     <div class="controls">
@@ -72,7 +72,7 @@
         <option value="intermittent">慢波 + 間歇紡錘</option>
       </select></label>
       <button id="siftStep" class="primary">▶ 做一次 sifting</button>
-      <button id="siftImf">⏭ 完成此 IMF（共 10 次）</button>
+      <button id="siftImf">▶▶ 完成此 IMF（共 10 次）</button>
       <button id="siftReset" class="ghost">↺ 重來</button>
     </div>
     <div class="status" id="siftStatus"></div>
@@ -93,7 +93,7 @@
       <div class="seg" id="stageSeg"></div>
       <label>方法 <select id="method"><option value="emd">EMD</option><option value="ceemd">CEEMD（互補集成）</option></select></label>
       <label>白雜訊 <input type="range" id="noise" min="0" max="0.8" step="0.05" value="0.15"><output id="noiseOut">0.15</output></label>
-      <button id="reseed" class="ghost">🎲 換一段</button>
+      <button id="reseed" class="ghost">換一段訊號</button>
     </div>
     <div class="status" id="decStatus"></div>
     <figure><canvas id="cRaw"></canvas><figcaption>原始訊號（20 秒）</figcaption></figure>

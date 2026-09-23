@@ -2,7 +2,7 @@
   --bg: #f6f4ef; --panel: #ffffff; --ink: #1d2230; --muted: #6a7080; --grid: #d9d6cf; --line: #e6e2da;
   --accent: #2f6fdf; --accent-2: #d9542b; --accent-3: #1a9a7a; --accent-4: #8a5cd0;
   --hero: #111a2e; --hero-ink: #eef1f8; --hero-muted: #9aa6c2;
-  --font-sans: 'Noto Sans TC', system-ui, sans-serif; --font-serif: 'Noto Serif TC', serif; --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Noto Sans TC', system-ui, sans-serif; --font-serif: 'Noto Serif TC', serif; --font-mono: 'JetBrains Mono', ui-monospace, monospace, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
