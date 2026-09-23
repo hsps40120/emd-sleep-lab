@@ -2,6 +2,8 @@
 
 黃鍔院士（Norden E. Huang）演講「EMD 在睡眠上的研究」的課前導讀網站。它把 **經驗模態分解（EMD）、CEEMD、Hilbert–Huang 轉換、Holo-Hilbert 頻譜分析（HHSA）與 iPDF** 用原生 JavaScript 實作，全部在瀏覽器裡即時計算，讓讀者可以動手操作每一個步驟。
 
+🔗 **網站：https://hsps40120.github.io/emd-sleep-lab/**
+
 ## 內容
 
 | 節 | 互動 | 對應論文 |
