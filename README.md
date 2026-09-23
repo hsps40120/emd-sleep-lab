@@ -46,3 +46,9 @@ test/           Node 測試
 - Huang NE, et al. (2016) *Phil Trans R Soc A* 374:20150206. doi:10.1098/rsta.2015.0206
 - Liu MY, Huang A, Huang NE (2017) *Front Hum Neurosci* 11:261. doi:10.3389/fnhum.2017.00261
 - Huang NE, et al. (2025) *Biol Psychol* 200:109101. doi:10.1016/j.biopsycho.2025.109101
+
+## 部署說明
+
+網站部署於 **GitHub Pages**：https://hsps40120.github.io/emd-sleep-lab/
+
+原訂同時部署到 Zeabur，但 Zeabur 已停用共享叢集（Shared Cluster），新專案必須另外付費租用伺服器（[官方公告](https://zeabur.com/changelogs/phasing-out-shared-cluster)），實際建立專案時 API 回傳 `Shared clusters are deprecated. Please rent a Server`，因此改用免費的 GitHub Pages。本站為純靜態網站，若日後有 Zeabur 伺服器，可直接以 `npx zeabur deploy` 部署，不需修改程式碼。
